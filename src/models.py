@@ -1,12 +1,3 @@
-"""
-Classifier training and evaluation for behavioural biometric authentication.
-
-Each user is treated as a binary classification problem: sessions from the
-claimed user are labelled 1 (legitimate), sessions from all other users
-are labelled 0 (imposter). Three classifiers are compared: Random Forest,
-K-Nearest Neighbours, and Gradient Boosting.
-"""
-
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
@@ -25,29 +16,11 @@ FEATURE_COLUMNS = [
 
 
 def prepare_binary_classification(df, target_user, imposter_sample_size=None):
-    """
-    Build a binary classification dataset for one target user.
     
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Full dataset with user_id column.
-    target_user : str
-        The user ID to treat as legitimate (label 1).
-    imposter_sample_size : int or None
-        Number of imposter sessions to sample. If None, uses all available.
-    
-    Returns
-    -------
-    X : np.ndarray
-        Feature matrix.
-    y : np.ndarray
-        Labels (1 = legitimate, 0 = imposter).
-    """
     legitimate = df[df['user_id'] == target_user]
     imposters = df[df['user_id'] != target_user]
     
-    # Sample imposters to match legitimate count (roughly balanced classes)
+    #sample imposters to match legitimate count (roughly balanced classes)
     if imposter_sample_size is None:
         imposter_sample_size = min(len(imposters), len(legitimate) * 3)
     
@@ -56,7 +29,7 @@ def prepare_binary_classification(df, target_user, imposter_sample_size=None):
         random_state=42
     )
     
-    # Combine and label
+    #combine all and label
     legitimate = legitimate.copy()
     legitimate['label'] = 1
     imposters_sampled = imposters_sampled.copy()
@@ -71,13 +44,7 @@ def prepare_binary_classification(df, target_user, imposter_sample_size=None):
 
 
 def compute_metrics(y_true, y_pred):
-    """
-    Compute accuracy, FAR, FRR, and EER for a binary classification result.
-    
-    FAR (False Acceptance Rate) = imposters incorrectly accepted / total imposters
-    FRR (False Rejection Rate) = legitimate users incorrectly rejected / total legitimate
-    EER (Equal Error Rate) = approximation as mean of FAR and FRR
-    """
+   
     acc = accuracy_score(y_true, y_pred)
     
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
@@ -90,23 +57,7 @@ def compute_metrics(y_true, y_pred):
 
 
 def train_and_evaluate(df, classifier_name='RandomForest', max_users=None):
-    """
-    Train and evaluate one classifier across all users in the dataset.
-    
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Loaded dataset from load_cmu or load_aalto.
-    classifier_name : str
-        One of 'RandomForest', 'KNN', 'GradientBoosting'.
-    max_users : int or None
-        If set, only evaluate this many users (for faster iteration).
-    
-    Returns
-    -------
-    pd.DataFrame
-        Per-user metrics with columns: user_id, accuracy, FAR, FRR, EER.
-    """
+   
     users = df['user_id'].unique()
     if max_users is not None:
         users = users[:max_users]
@@ -115,7 +66,7 @@ def train_and_evaluate(df, classifier_name='RandomForest', max_users=None):
     
     results = []
     for i, user in enumerate(users):
-        # Need at least a few sessions of this user
+        #need at least a few sessions of this user
         if (df['user_id'] == user).sum() < 5:
             continue
         
@@ -154,9 +105,7 @@ def train_and_evaluate(df, classifier_name='RandomForest', max_users=None):
 
 
 def run_full_evaluation(df, dataset_name):
-    """
-    Run all three classifiers on a dataset and return combined results.
-    """
+   
     all_results = []
     for classifier in ['RandomForest', 'KNN', 'GradientBoosting']:
         per_user_results = train_and_evaluate(df, classifier)

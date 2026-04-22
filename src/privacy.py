@@ -1,11 +1,3 @@
-"""
-Differential privacy mechanisms for behavioural biometric features.
-
-Implements the Laplace mechanism for adding calibrated noise to feature
-vectors before classifier training. This tests the privacy-accuracy
-trade-off across multiple epsilon values.
-"""
-
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
@@ -17,29 +9,7 @@ from models import prepare_binary_classification, compute_metrics, FEATURE_COLUM
 
 
 def apply_laplace_noise(X, epsilon, sensitivity=1.0, random_state=42):
-    """
-    Add Laplace noise to a feature matrix for differential privacy.
     
-    Noise is drawn from a Laplace distribution with scale = sensitivity / epsilon.
-    Smaller epsilon produces larger noise and stronger privacy guarantees.
-    
-    Parameters
-    ----------
-    X : np.ndarray
-        Feature matrix (already standardised).
-    epsilon : float
-        Privacy budget. Smaller values = stronger privacy.
-    sensitivity : float, default 1.0
-        Maximum change any single record can induce on the output.
-        For z-score normalised features, 1.0 is a reasonable bound.
-    random_state : int
-        Seed for reproducibility.
-    
-    Returns
-    -------
-    np.ndarray
-        Feature matrix with noise added.
-    """
     rng = np.random.default_rng(random_state)
     scale = sensitivity / epsilon
     noise = rng.laplace(loc=0.0, scale=scale, size=X.shape)
@@ -47,25 +17,7 @@ def apply_laplace_noise(X, epsilon, sensitivity=1.0, random_state=42):
 
 
 def train_with_privacy(df, classifier_name, epsilon, max_users=None):
-    """
-    Train classifier on noisy features for all users in the dataset.
-    
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Loaded dataset.
-    classifier_name : str
-        One of 'RandomForest', 'KNN', 'GradientBoosting'.
-    epsilon : float or None
-        Privacy budget. If None, no noise is added (baseline).
-    max_users : int or None
-        If set, only evaluate this many users.
-    
-    Returns
-    -------
-    pd.DataFrame
-        Per-user metrics.
-    """
+   
     users = df['user_id'].unique()
     if max_users is not None:
         users = users[:max_users]
@@ -88,7 +40,7 @@ def train_with_privacy(df, classifier_name, epsilon, max_users=None):
         X_train = scaler.fit_transform(X_train)
         X_test = scaler.transform(X_test)
         
-        # Apply differential privacy noise (only to training data)
+        #apply differential privacy noise but only to training data
         if epsilon is not None:
             X_train = apply_laplace_noise(X_train, epsilon)
         
@@ -114,17 +66,10 @@ def train_with_privacy(df, classifier_name, epsilon, max_users=None):
 
 
 def run_privacy_evaluation(df, dataset_name, epsilons=(0.5, 1.0, 2.0, 5.0)):
-    """
-    Run all classifiers across all epsilon values plus baseline.
-    
-    Returns
-    -------
-    pd.DataFrame
-        Combined per-user metrics.
-    """
+   
     all_results = []
     
-    # Include None (baseline) plus the epsilon values
+    #include none (baseline) plus the epsilon values
     eps_values = [None] + list(epsilons)
     
     print(f"Privacy evaluation on {dataset_name}:")

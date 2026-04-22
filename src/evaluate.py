@@ -1,15 +1,3 @@
-"""
-Attack simulation and security evaluation for behavioural biometric authentication.
-
-Implements three attack scenarios:
-1. Zero-effort imposter attack: random users attempt to authenticate as the target
-2. Graduated knowledge attack: varying numbers of imposter samples available
-3. Cross-dataset generalisation: models trained on one dataset tested on another
-
-These analyses reframe the baseline classification results through a security lens
-and produce figures suitable for the evaluation chapter of the dissertation.
-"""
-
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -19,15 +7,7 @@ from models import FEATURE_COLUMNS
 
 
 def zero_effort_attack_per_user(df, max_users=None):
-    """
-    Measure each user's vulnerability to zero-effort imposter attacks.
-    
-    For each target user, every other user attempts to authenticate as them.
-    Returns per-user detection rates showing which users are most vulnerable.
-    
-    This is the standard zero-effort attack model: the imposter makes no attempt
-    to mimic the target's behaviour and simply uses their own natural typing.
-    """
+  
     users = df['user_id'].unique()
     if max_users is not None:
         users = users[:max_users]
@@ -41,41 +21,41 @@ def zero_effort_attack_per_user(df, max_users=None):
         if len(target_sessions) < 10:
             continue
         
-        # Split target user's data: 70% for training, 30% for testing
+        #split the target user's data=70% for training- 30% for testing
         n_train = int(len(target_sessions) * 0.7)
         target_train = target_sessions.iloc[:n_train]
         target_test = target_sessions.iloc[n_train:]
         
-        # Get imposter sessions from ALL other users
+        #get imposter sessions from all other users
         imposter_sessions = df[df['user_id'] != target_user]
         
-        # Sample imposters for training (balanced with target)
+        #sample imposters for training so it;s balanced with target
         imposter_train = imposter_sessions.sample(
             n=min(len(imposter_sessions), len(target_train) * 3),
             random_state=42
         )
         
-        # Build training set
+        #build the training set
         X_train = pd.concat([
             target_train[FEATURE_COLUMNS],
             imposter_train[FEATURE_COLUMNS]
         ])
         y_train = np.array([1] * len(target_train) + [0] * len(imposter_train))
         
-        # Standardise
+       
         scaler = StandardScaler()
         X_train_scaled = scaler.fit_transform(X_train)
         
-        # Train Random Forest (best performer from baseline)
+        #start training Random Forest as it was the best performer from baseline
         clf = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
         clf.fit(X_train_scaled, y_train)
         
-        # Test 1: Can the system correctly accept the legitimate user?
+        #first test: Can the system correctly accept the legitimate user?
         X_legit_test = scaler.transform(target_test[FEATURE_COLUMNS])
         legit_preds = clf.predict(X_legit_test)
         true_accept_rate = np.mean(legit_preds == 1)
         
-        # Test 2: Can the system correctly reject each imposter?
+        #secondd test: Can the system correctly reject each imposter?
         other_users = [u for u in users if u != target_user]
         imposter_reject_rates = []
         
@@ -109,21 +89,11 @@ def zero_effort_attack_per_user(df, max_users=None):
 
 
 def graduated_knowledge_attack(df, target_user=None, sample_sizes=(5, 10, 20, 50, 100)):
-    """
-    Test how detection rate changes as the imposter has more sample data.
     
-    Simulates an attacker who has observed varying amounts of the target user's
-    typing behaviour. With more observations, the attacker could potentially
-    build a better model of the target's behaviour.
-    
-    In this zero-effort variant, the attacker doesn't actually USE the knowledge
-    to mimic behaviour — they just type naturally. But the classifier's training
-    set size varies, showing how model robustness scales with enrollment depth.
-    """
     users = df['user_id'].unique()
     
     if target_user is None:
-        # Pick user with most sessions for best demonstration
+        #pick user with most sessions for best demonstration
         session_counts = df.groupby('user_id').size()
         target_user = session_counts.idxmax()
     
@@ -137,17 +107,17 @@ def graduated_knowledge_attack(df, target_user=None, sample_sizes=(5, 10, 20, 50
         if n_train_samples > len(target_sessions) - 5:
             continue
         
-        # Use first n samples for training, rest for testing
+        #use first n samples for training, rest for testing
         target_train = target_sessions.iloc[:n_train_samples]
         target_test = target_sessions.iloc[n_train_samples:]
         
-        # Fixed imposter training set
+        #fixed imposter training set
         imposter_train = imposter_sessions.sample(
             n=min(len(imposter_sessions), n_train_samples * 3),
             random_state=42
         )
         
-        # Build and train
+        #build and train
         X_train = pd.concat([
             target_train[FEATURE_COLUMNS],
             imposter_train[FEATURE_COLUMNS]
@@ -160,12 +130,12 @@ def graduated_knowledge_attack(df, target_user=None, sample_sizes=(5, 10, 20, 50
         clf = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
         clf.fit(X_train_scaled, y_train)
         
-        # Test legitimate acceptance
+        #test legitimate acceptance
         X_legit_test = scaler.transform(target_test[FEATURE_COLUMNS])
         legit_preds = clf.predict(X_legit_test)
         true_accept_rate = np.mean(legit_preds == 1)
         
-        # Test imposter rejection (sample of 50 random imposters)
+        #test imposter rejection (sample of 50 random imposters)
         imposter_test_users = [u for u in users if u != target_user]
         np.random.seed(42)
         imposter_test_sample = np.random.choice(
@@ -199,14 +169,7 @@ def graduated_knowledge_attack(df, target_user=None, sample_sizes=(5, 10, 20, 50
 
 
 def cross_dataset_attack(train_df, test_df, train_name, test_name, max_users=None):
-    """
-    Train a model on one dataset and test on another.
     
-    This tests whether behavioural patterns generalise across different
-    typing contexts (fixed password vs free text, desktop vs mobile).
-    Poor cross-dataset performance indicates context-dependence of
-    behavioural biometrics, which has implications for deployment.
-    """
     train_users = train_df['user_id'].unique()
     test_users = test_df['user_id'].unique()
     
@@ -216,12 +179,11 @@ def cross_dataset_attack(train_df, test_df, train_name, test_name, max_users=Non
     print(f"Cross-dataset attack: train on {train_name}, test on {test_name}...")
     print(f"  Training users: {len(train_users)}, Test users: {len(test_users)}")
     
-    # Build a general "legitimate typing" model from the training dataset
-    # This represents a generic behavioural profile, not user-specific
+    #build a general model from the training dataset-- not user specific
+   
     
-    # Strategy: for each test user, train on ALL training dataset users as imposters
-    # and the test user's own data as legitimate
-    # Then test whether the model can distinguish the test user from training users
+    #the strategy is for each test user, train on all training dataset users as imposters
+    #and the test user's own data as legitimate then test whether the model can distinguish the test user from training users
     
     results = []
     for i, test_user in enumerate(test_users):
@@ -230,12 +192,12 @@ def cross_dataset_attack(train_df, test_df, train_name, test_name, max_users=Non
         if len(test_user_sessions) < 5:
             continue
         
-        # Split test user data
+       
         n_train = int(len(test_user_sessions) * 0.7)
         user_train = test_user_sessions.iloc[:n_train]
         user_test = test_user_sessions.iloc[n_train:]
         
-        # Use random sample from training dataset as imposters
+        #use random sample from training dataset as imposters
         imposter_sample = train_df.sample(
             n=min(len(train_df), len(user_train) * 3),
             random_state=42
@@ -253,12 +215,12 @@ def cross_dataset_attack(train_df, test_df, train_name, test_name, max_users=Non
         clf = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
         clf.fit(X_train_scaled, y_train)
         
-        # Test legitimate acceptance
+        #test legitimate acceptance
         X_legit = scaler.transform(user_test[FEATURE_COLUMNS])
         legit_preds = clf.predict(X_legit)
         true_accept = np.mean(legit_preds == 1)
         
-        # Test rejection of training dataset users
+        #test rejection of training dataset users
         cross_imposters = train_df.sample(
             n=min(500, len(train_df)),
             random_state=42
